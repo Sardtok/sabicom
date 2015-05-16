@@ -4,6 +4,8 @@ A NES emulator written in Rust.
 
 What? Another NES emulator? Who the hell needs another NES emulator? No one does, but I'd still like to make one.
 
+What's with the name? Sabi is rust in Japanese. And Sabicom is pretty close to Famicom, the Japanese (abbreviated) name for the NES.
+
 # License
 
     Sabicom is a NES emulator written in Rust.
