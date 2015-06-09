@@ -2,17 +2,18 @@ pub struct CPU2A03 {
     a: u8,
     x: u8,
     y: u8,
+    sp: u8,
     pc: u16,
     cc: u16,
     mem: Vec<u8>,
-    c: bool,
-    z: bool,
-    i: bool,
-    d: bool,
-    b: bool,
-    the_one: bool,
-    v: bool,
-    s: bool
+    flag_c: bool,
+    flag_z: bool,
+    flag_i: bool,
+    flag_d: bool,
+    flag_b: bool,
+    flag_1: bool,
+    flag_v: bool,
+    flag_s: bool
 }
 
 impl CPU2A03 {
@@ -21,22 +22,42 @@ impl CPU2A03 {
             a:       0,
             x:       0,
             y:       0,
+            sp:      0,
             pc:      0,
             cc:      0,
             mem:     vec![0; 65536],
-            c:       false,
-            z:       false,
-            i:       false,
-            d:       false,
-            b:       false,
-            the_one: true,
-            v:       false,
-            s:       false
+            flag_c:  false,
+            flag_z:  false,
+            flag_i:  false,
+            flag_d:  false,
+            flag_b:  false,
+            flag_1:  true,
+            flag_v:  false,
+            flag_s:  false
         }
+    }
+
+    fn brk(&mut self) {
+        self.flag_i = true;
+    }
+
+    fn clc(&mut self) {
+        self.flag_c = false;
+        self.cc += 1;
+    }
+
+    fn cld(&mut self) {
+        self.flag_d = false;
+        self.cc += 1;
     }
     
     fn cli(&mut self) {
-        self.i = false;
+        self.flag_i = false;
+        self.cc += 1;
+    }
+
+    fn clv(&mut self) {
+        self.flag_v = false;
         self.cc += 1;
     }
 
