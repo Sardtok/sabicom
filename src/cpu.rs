@@ -36,9 +36,9 @@ impl CPU2A03 {
             flag_s:  false
         }
     }
-
+    
     fn brk(&mut self) {
-        self.flag_i = true;
+        self.flag_i = false;        
     }
 
     fn clc(&mut self) {
