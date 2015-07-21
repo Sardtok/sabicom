@@ -36,9 +36,45 @@ impl CPU2A03 {
             flag_s:  false
         }
     }
+
+    fn adc(&mut self, address: usize) {
+    }
+
+    fn and(&mut self, address: usize) {
+    }
+
+    fn asl(&mut self, address: usize) {
+    }
+
+    fn bcc(&mut self, address: usize) {
+    }
+
+    fn bcs(&mut self, address: usize) {
+    }
+
+    fn beq(&mut self, address: usize) {
+    }
+
+    fn bit(&mut self, address: usize) {
+    }
+
+    fn bmi(&mut self, address: usize) {
+    }
+
+    fn bne(&mut self, address: usize) {
+    }
+
+    fn bpl(&mut self, address: usize) {
+    }
     
     fn brk(&mut self) {
         self.flag_i = false;        
+    }
+
+    fn bvc(&mut self, address: usize) {
+    }
+
+    fn bvs(&mut self, address: usize) {
     }
 
     fn clc(&mut self) {
@@ -61,6 +97,42 @@ impl CPU2A03 {
         self.cc += 1;
     }
 
+    fn cmp(&mut self, address: usize) {
+    }
+
+    fn cpx(&mut self, address: usize) {
+    }
+
+    fn cpy(&mut self, address: usize) {
+    }
+
+    fn dec(&mut self) {
+    }
+
+    fn dex(&mut self) {
+    }
+
+    fn dey(&mut self) {
+    }
+
+    fn eor(&mut self, address: usize) {
+    }
+
+    fn inc(&mut self) {
+    }
+
+    fn inx(&mut self) {
+    }
+
+    fn iny(&mut self) {
+    }
+
+    fn jmp(&mut self, address: usize) {
+    }
+
+    fn jsr(&mut self, address: usize) {
+    }
+
     fn lda(&mut self, address: usize) {
         self.a = self.mem[address];
         self.cc += 1;
@@ -74,5 +146,74 @@ impl CPU2A03 {
     fn ldy(&mut self, address: usize) {
         self.y = self.mem[address];
         self.cc += 1;
+    }
+    
+    fn lsr(&mut self, address: usize) {
+    }
+
+    fn ora(&mut self, address: usize) {
+    }
+
+    fn pha(&mut self) {
+    }
+
+    fn php(&mut self) {
+    }
+
+    fn pla(&mut self) {
+    }
+
+    fn plp(&mut self) {
+    }
+
+    fn rol(&mut self, address: usize) {
+    }
+
+    fn ror(&mut self, address: usize) {
+    }
+
+    fn rti(&mut self) {
+    }
+
+    fn rts(&mut self) {
+    }
+
+    fn sbc(&mut self, address: usize) {
+    }
+
+    fn sec(&mut self) {
+    }
+
+    fn sed(&mut self) {
+    }
+
+    fn sei(&mut self) {
+    }
+
+    fn sta(&mut self, address: usize) {
+    }
+
+    fn stx(&mut self, address: usize) {
+    }
+
+    fn sty(&mut self, address: usize) {
+    }
+
+    fn tax(&mut self) {
+    }
+
+    fn tay(&mut self) {
+    }
+
+    fn tsx(&mut self) {
+    }
+
+    fn txa(&mut self) {
+    }
+
+    fn txs(&mut self) {
+    }
+
+    fn tya(&mut self) {
     }
 }
