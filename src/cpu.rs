@@ -68,9 +68,40 @@ impl CPU2A03 {
         // Low nibble E: ASL DEC INC LDX LSR ROL ROR STX
         return 0
     }
+
+    fn set_sign(&mut self, sign: bool) {
+        self.flag_s = sign
+    }
+    
+    fn set_carry(&mut self, carry: bool) {
+        self.flag_c = carry
+    }
+    
+    fn set_overflow(&mut self, overflow: bool) {
+        self.flag_v = overflow
+    }
+    
+    fn set_zero(&mut self, zero: bool) {
+        self.flag_z = zero
+    }
+    
+    fn set_interruptible(&mut self, interruptible: bool) {
+        self.flag_i = interruptible
+    }
+
+    fn set_decimal_mode(&mut self, decimal_mode: bool) {
+        self.flag_d = decimal_mode
+    }
     
     // OPCODES: 61 65 69 6D 71 75 79 7D
-    fn adc(&mut self, address: usize) {
+    fn adc(&mut self, value: u8) {
+        let acc: u8 = self.a;
+        let res: u8 = value + acc + if self.flag_c { 1 } else { 0 };
+        self.set_sign((res & 0xFF) != 0);
+        self.set_overflow(((value ^ acc) & 0x80) == 0
+                          && ((res ^ acc) & 0x80) != 0);
+        self.set_carry(res < value);
+        self.a = res
     }
 
     // OPCODES: 21 25 29 2D 31 35 39 3D
