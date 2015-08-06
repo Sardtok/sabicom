@@ -69,8 +69,8 @@ impl CPU2A03 {
         return 0
     }
 
-    fn set_sign(&mut self, sign: bool) {
-        self.flag_s = sign
+    fn set_sign(&mut self, value: u8) {
+        self.flag_s = value & 0x80 != 0
     }
     
     fn set_carry(&mut self, carry: bool) {
@@ -81,8 +81,8 @@ impl CPU2A03 {
         self.flag_v = overflow
     }
     
-    fn set_zero(&mut self, zero: bool) {
-        self.flag_z = zero
+    fn set_zero(&mut self, zero: u8) {
+        self.flag_z = zero == 0
     }
     
     fn set_interruptible(&mut self, interruptible: bool) {
@@ -97,7 +97,8 @@ impl CPU2A03 {
     fn adc(&mut self, value: u8) {
         let acc: u8 = self.a;
         let res: u8 = value + acc + if self.flag_c { 1 } else { 0 };
-        self.set_sign((res & 0xFF) != 0);
+        self.set_sign(res);
+        self.set_zero(res);
         self.set_overflow(((value ^ acc) & 0x80) == 0
                           && ((res ^ acc) & 0x80) != 0);
         self.set_carry(res < value);
@@ -105,7 +106,11 @@ impl CPU2A03 {
     }
 
     // OPCODES: 21 25 29 2D 31 35 39 3D
-    fn and(&mut self, address: usize) {
+    fn and(&mut self, value: u8) {
+        let res = value & self.a;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.a = res
     }
 
     // OPCODES: 06 0A 0E 16 1E
