@@ -160,26 +160,22 @@ impl CPU2A03 {
 
     // OPCODES: 18
     fn clc(&mut self) {
-        self.flag_c = false;
-        self.cc += 1;
+        self.set_carry(false)
     }
 
     // OPCODES: D8
     fn cld(&mut self) {
-        self.flag_d = false;
-        self.cc += 1;
+        self.set_decimal_mode(false)
     }
     
     // OPCODES: 58
     fn cli(&mut self) {
-        self.flag_i = false;
-        self.cc += 1;
+        self.set_interruptible(false)
     }
 
     // OPCODES: B8
     fn clv(&mut self) {
-        self.flag_v = false;
-        self.cc += 1;
+        self.set_overflow(false)
     }
 
     // OPCODES: C1 C5 C9 CD D1 D5 D9 DD
@@ -289,19 +285,30 @@ impl CPU2A03 {
     }
 
     // OPCODES: E1 E5 E9 ED F1 F5 F9 FD
-    fn sbc(&mut self, address: usize) {
+    fn sbc(&mut self, value: u8) {
+        let acc: u8 = self.a;
+        let res: u8 = value - acc - if self.flag_c { 0 } else { 1 };
+        self.set_sign(res);
+        self.set_zero(res);
+        self.set_overflow(((value ^ acc) & 0x80) == 0
+                          && ((res ^ acc) & 0x80) != 0);
+        self.set_carry(res < value);
+        self.a = res
     }
 
     // OPCODES: 38
     fn sec(&mut self) {
+        self.set_carry(true)
     }
 
     // OPCODES: F8
     fn sed(&mut self) {
+        self.set_decimal_mode(true)
     }
 
     // OPCODES: 78
     fn sei(&mut self) {
+        self.set_interruptible(true)
     }
 
     // OPCODES: 81 85 89 8D 91 95 99 9D
