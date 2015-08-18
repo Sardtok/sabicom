@@ -325,25 +325,49 @@ impl CPU2A03 {
 
     // OPCODES: AA
     fn tax(&mut self) {
+        let src = self.a;
+        self.set_zero(src);
+        self.set_sign(src);
+        self.x = src
     }
 
     // OPCODES: A8
     fn tay(&mut self) {
+        let src = self.a;
+        self.set_zero(src);
+        self.set_sign(src);
+        self.y = src
     }
 
     // OPCODES: BA
     fn tsx(&mut self) {
+        let src = self.sp;
+        self.set_zero(src);
+        self.set_sign(src);
+        self.x = src
     }
 
     // OPCODES: 8A
     fn txa(&mut self) {
+        let src = self.x;
+        self.set_zero(src);
+        self.set_sign(src);
+        self.a = src
     }
 
     // OPCODES: 9A
     fn txs(&mut self) {
+        let src = self.x;
+        self.set_zero(src);
+        self.set_sign(src);
+        self.sp = src
     }
 
     // OPCODES: 98
     fn tya(&mut self) {
+        let src = self.y;
+        self.set_zero(src);
+        self.set_sign(src);
+        self.a = src
     }
 }
