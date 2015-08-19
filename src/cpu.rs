@@ -107,7 +107,7 @@ impl CPU2A03 {
 
     // OPCODES: 21 25 29 2D 31 35 39 3D
     fn and(&mut self, value: u8) {
-        let res = value & self.a;
+        let res = self.a & value;
         self.set_sign(res);
         self.set_zero(res);
         self.a = res
@@ -130,7 +130,11 @@ impl CPU2A03 {
     }
 
     // OPCODES: 24 2C
-    fn bit(&mut self, address: usize) {
+    fn bit(&mut self, value: u8) {
+        let acc = self.a;
+        self.set_sign(value);
+        self.set_overflow(value & 0x40 != 0);
+        self.set_zero(value & acc)
     }
 
     // OPCODES: 30
@@ -179,31 +183,59 @@ impl CPU2A03 {
     }
 
     // OPCODES: C1 C5 C9 CD D1 D5 D9 DD
-    fn cmp(&mut self, address: usize) {
+    fn cmp(&mut self, value: u8) {
+        let res = self.a - value;
+        self.set_carry(false); // FIX THIS
+        self.set_sign(res);
+        self.set_zero(res)
     }
 
     // OPCODES: E0 E4 EC
-    fn cpx(&mut self, address: usize) {
+    fn cpx(&mut self, value: u8) {
+        let res = self.x - value;
+        self.set_carry(false); // FIX THIS
+        self.set_sign(res);
+        self.set_zero(res)
     }
 
     // OPCODES: C0 C4 CC
-    fn cpy(&mut self, address: usize) {
+    fn cpy(&mut self, value: u8) {
+        let res = self.y - value;
+        self.set_carry(false); // FIX THIS
+        self.set_sign(res);
+        self.set_zero(res)
     }
 
     // OPCODES: C6 CE D6 DE
-    fn dec(&mut self) {
+    fn dec(&mut self, address: usize) {
+        let res = self.mem[address] - 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.mem[address] = res
     }
 
     // OPCODES: CA
     fn dex(&mut self) {
+        let res = self.x - 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.x = res
     }
 
     // OPCODES: 88
     fn dey(&mut self) {
+        let res = self.y - 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.y = res
     }
 
     // OPCODES: 41 45 49 4D 51 55 59 5D
-    fn eor(&mut self, address: usize) {
+    fn eor(&mut self, value: u8) {
+        let res = self.a ^ value;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.a = res
     }
 
     // OPCODES: E6 EE F6 FE
@@ -250,6 +282,10 @@ impl CPU2A03 {
 
     // OPCODES: 01 05 09 0D 11 15 19 1D
     fn ora(&mut self, address: usize) {
+        let res = self.a | value;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.a = res
     }
 
     // OPCODES: 48
@@ -292,7 +328,7 @@ impl CPU2A03 {
         self.set_zero(res);
         self.set_overflow(((value ^ acc) & 0x80) == 0
                           && ((res ^ acc) & 0x80) != 0);
-        self.set_carry(res < value);
+        self.set_carry(res < value); // This is not right. This simply means value is more than half of A
         self.a = res
     }
 
