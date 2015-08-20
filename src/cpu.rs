@@ -463,10 +463,14 @@ impl CPU2A03 {
 
     // OPCODES: 4D
     fn rti(&mut self) {
+        let status = self.pull();
+        self.set_status(status);
+        self.pc = (self.pull() as usize) | ((self.pull() as usize) << 8)
     }
 
     // OPCODES: 60
     fn rts(&mut self) {
+        self.pc = (self.pull() as usize) | ((self.pull() as usize) << 8) + 1
     }
 
     // OPCODES: E1 E5 E9 ED F1 F5 F9 FD
