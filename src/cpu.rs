@@ -123,10 +123,22 @@ impl CPU2A03 {
         self.a = res
     }
 
-    // OPCODES: 06 0A 0E 16 1E
-    fn asl(&mut self, address: usize) {
+    // OPCODES: 06 0E 16 1E
+    fn asl_mem(&mut self, address: usize) {
+        let res = self.mem[address] << 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.mem[address] = res
     }
 
+    // OPCODES: 0A
+    fn asl_acc(&mut self) {
+        let res = self.a << 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.a = res
+    }
+    
     // OPCODES: 90
     fn bcc(&mut self, address: usize) {
     }
@@ -304,8 +316,20 @@ impl CPU2A03 {
         self.cc += 1;
     }
 
-    // OPCODES: 46 4A 4E 56 5E
-    fn lsr(&mut self, address: usize) {
+    // OPCODES: 46 4E 56 5E
+    fn lsr_mem(&mut self, address: usize) {
+        let res = self.mem[address] >> 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.mem[address] = res
+    }
+
+    // OPCODES: 4A
+    fn lsr_acc(&mut self) {
+        let res = self.a >> 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.a = res
     }
 
     // OPCODES: 01 05 09 0D 11 15 19 1D
@@ -332,12 +356,44 @@ impl CPU2A03 {
     fn plp(&mut self) {
     }
 
-    // OPCODES: 26 2A 2E 36 3E
-    fn rol(&mut self, address: usize) {
+    // OPCODES: 26 2E 36 3E
+    fn rol_mem(&mut self, address: usize) {
+        let res = (self.mem[address] << 1) | if self.flag_c { 1 } else { 0 };
+        let carry = self.mem[address] & 0x80 != 0;
+        self.set_carry(carry);
+        self.set_sign(res);
+        self.set_zero(res);
+        self.mem[address] = res
     }
 
-    // OPCODES: 66 6A 6E 76 7E
-    fn ror(&mut self, address: usize) {
+    // OPCODES: 2A
+    fn rol_acc(&mut self) {
+        let res = (self.a << 1) | if self.flag_c { 1 } else { 0 };
+        let carry = self.a & 0x80 != 0;
+        self.set_carry(carry);
+        self.set_sign(res);
+        self.set_zero(res);
+        self.a = res
+    }
+
+    // OPCODES: 66 6E 76 7E
+    fn ror_mem(&mut self, address: usize) {
+        let res = (self.mem[address] >> 1) | if self.flag_c { 0x80 } else { 0 };
+        let carry = self.mem[address] & 1 != 0;
+        self.set_carry(carry);
+        self.set_sign(res);
+        self.set_zero(res);
+        self.mem[address] = res
+    }
+    
+    // OPCODES: 6A
+    fn ror_acc(&mut self) {
+        let res = (self.a >> 1) | if self.flag_c { 0x80 } else { 0 };
+        let carry = self.a & 1 != 0;
+        self.set_carry(carry);
+        self.set_sign(res);
+        self.set_zero(res);
+        self.a = res
     }
 
     // OPCODES: 4D
@@ -378,14 +434,17 @@ impl CPU2A03 {
 
     // OPCODES: 81 85 89 8D 91 95 99 9D
     fn sta(&mut self, address: usize) {
+        self.mem[address] = self.a
     }
 
     // OPCODES: 86 8E 96
     fn stx(&mut self, address: usize) {
+        self.mem[address] = self.x
     }
 
     // OPCODES: 84 8C 94
     fn sty(&mut self, address: usize) {
+        self.mem[address] = self.y
     }
 
     // OPCODES: AA
