@@ -69,6 +69,16 @@ impl CPU2A03 {
         return 0
     }
 
+    fn push(&mut self, value: u8) {
+        self.mem[0x100 + self.sp as usize] = value;
+        self.sp += 1
+    }
+
+    fn pull(&mut self) -> u8 {
+        self.sp -= 1;
+        return self.mem[0x100 + self.sp as usize]
+    }
+
     fn set_sign(&mut self, value: u8) {
         self.flag_s = value & 0x80 != 0
     }
@@ -184,8 +194,9 @@ impl CPU2A03 {
 
     // OPCODES: C1 C5 C9 CD D1 D5 D9 DD
     fn cmp(&mut self, value: u8) {
-        let res = self.a - value;
-        self.set_carry(false); // FIX THIS
+        let acc = self.a;
+        let res = acc - value;
+        self.set_carry(value > acc);
         self.set_sign(res);
         self.set_zero(res)
     }
@@ -240,14 +251,26 @@ impl CPU2A03 {
 
     // OPCODES: E6 EE F6 FE
     fn inc(&mut self) {
+        let res = self.mem[address] + 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.mem[address] = res
     }
 
     // OPCODES: E8
     fn inx(&mut self) {
+        let res = self.x + 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.x = res
     }
 
     // OPCODES: C8
     fn iny(&mut self) {
+        let res = self.y + 1;
+        self.set_sign(res);
+        self.set_zero(res);
+        self.y = res
     }
 
     // OPCODES: 6C 4C
@@ -281,7 +304,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: 01 05 09 0D 11 15 19 1D
-    fn ora(&mut self, address: usize) {
+    fn ora(&mut self, value: u8) {
         let res = self.a | value;
         self.set_sign(res);
         self.set_zero(res);
@@ -323,12 +346,13 @@ impl CPU2A03 {
     // OPCODES: E1 E5 E9 ED F1 F5 F9 FD
     fn sbc(&mut self, value: u8) {
         let acc: u8 = self.a;
-        let res: u8 = value - acc - if self.flag_c { 0 } else { 1 };
+        let carry: u8 = if self.flag_c { 0 } else { 1 };
+        let res: u8 = acc - value - carry;
         self.set_sign(res);
         self.set_zero(res);
         self.set_overflow(((value ^ acc) & 0x80) == 0
                           && ((res ^ acc) & 0x80) != 0);
-        self.set_carry(res < value); // This is not right. This simply means value is more than half of A
+        self.set_carry(value > acc - carry);
         self.a = res
     }
 
