@@ -117,8 +117,8 @@ impl CPU2A03 {
         self.flag_z = zero == 0
     }
     
-    fn set_interruptible(&mut self, interruptible: bool) {
-        self.flag_i = interruptible
+    fn set_interrupt_disable(&mut self, disable: bool) {
+        self.flag_i = disable
     }
 
     fn set_decimal_mode(&mut self, decimal_mode: bool) {
@@ -163,14 +163,23 @@ impl CPU2A03 {
     
     // OPCODES: 90
     fn bcc(&mut self, address: usize) {
+        if !self.flag_c {
+            self.pc += address
+        }
     }
 
     // OPCODES: B0
     fn bcs(&mut self, address: usize) {
+        if self.flag_c {
+            self.pc += address
+        }
     }
 
     // OPCODES: F0
     fn beq(&mut self, address: usize) {
+        if self.flag_z {
+            self.pc += address
+        }
     }
 
     // OPCODES: 24 2C
@@ -183,27 +192,51 @@ impl CPU2A03 {
 
     // OPCODES: 30
     fn bmi(&mut self, address: usize) {
+        if self.flag_s {
+            self.pc += address
+        }
     }
 
     // OPCODES: D0
     fn bne(&mut self, address: usize) {
+        if !self.flag_z {
+            self.pc += address
+        }
     }
 
     // OPCODES: 10
     fn bpl(&mut self, address: usize) {
+        if !self.flag_s {
+            self.pc += address
+        }
     }
 
     // OPCODES: 00
     fn brk(&mut self) {
-        self.flag_i = false;        
+        let pc = self.pc + 1;
+        self.push((pc >> 8) as u8);
+        self.push(pc as u8);
+        
+        self.flag_b = true;
+        let status = self.get_status();
+        self.push(status);
+
+        self.set_interrupt_disable(true);
+        self.pc = (self.mem[0xffff] as usize) << 8 | self.mem[0xfffe] as usize
     }
 
     // OPCODES: 50
     fn bvc(&mut self, address: usize) {
+        if !self.flag_v {
+            self.pc += address
+        }
     }
 
     // OPCODES: 70
     fn bvs(&mut self, address: usize) {
+        if self.flag_v {
+            self.pc += address
+        }
     }
 
     // OPCODES: 18
@@ -218,7 +251,7 @@ impl CPU2A03 {
     
     // OPCODES: 58
     fn cli(&mut self) {
-        self.set_interruptible(false)
+        self.set_interrupt_disable(false)
     }
 
     // OPCODES: B8
@@ -461,7 +494,7 @@ impl CPU2A03 {
 
     // OPCODES: 78
     fn sei(&mut self) {
-        self.set_interruptible(true)
+        self.set_interrupt_disable(true)
     }
 
     // OPCODES: 81 85 89 8D 91 95 99 9D
