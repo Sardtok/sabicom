@@ -76,7 +76,29 @@ impl CPU2A03 {
 
     fn pull(&mut self) -> u8 {
         self.sp -= 1;
-        return self.mem[0x100 + self.sp as usize]
+        self.mem[0x100 + self.sp as usize]
+    }
+
+    fn get_status(&self) -> u8 {
+        (self.flag_c as u8)
+            | (self.flag_z as u8) << 1
+            | (self.flag_i as u8) << 2
+            | (self.flag_d as u8) << 3
+            | (self.flag_b as u8) << 4
+            | (self.flag_1 as u8) << 5
+            | (self.flag_v as u8) << 6
+            | (self.flag_s as u8) << 7
+    }
+
+    fn set_status(&mut self, value: u8) {
+        self.flag_c = value & 1 != 0;
+        self.flag_z = value & 2 != 0;
+        self.flag_i = value & 3 != 0;
+        self.flag_d = value & 4 != 0;
+        self.flag_b = value & 5 != 0;
+        self.flag_1 = value & 6 != 0;
+        self.flag_v = value & 7 != 0;
+        self.flag_s = value & 8 != 0;
     }
 
     fn set_sign(&mut self, value: u8) {
@@ -342,18 +364,28 @@ impl CPU2A03 {
 
     // OPCODES: 48
     fn pha(&mut self) {
+        let value = self.a;
+        self.push(value)
     }
 
     // OPCODES: 08
     fn php(&mut self) {
+        let value = self.get_status();
+        self.push(value)
     }
 
     // OPCODES: 68
     fn pla(&mut self) {
+        let res = self.pull();
+        self.set_sign(res);
+        self.set_zero(res);
+        self.a = res
     }
 
     // OPCODES: 28
     fn plp(&mut self) {
+        let value = self.pull();
+        self.set_status(value)
     }
 
     // OPCODES: 26 2E 36 3E
