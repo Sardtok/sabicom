@@ -3,7 +3,7 @@ pub struct CPU2A03 {
     x: u8,
     y: u8,
     sp: u8,
-    pc: u16,
+    pc: usize,
     cc: u16,
     mem: Vec<u8>,
     flag_c: bool,
@@ -250,7 +250,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: E6 EE F6 FE
-    fn inc(&mut self) {
+    fn inc(&mut self, address: usize) {
         let res = self.mem[address] + 1;
         self.set_sign(res);
         self.set_zero(res);
@@ -275,10 +275,15 @@ impl CPU2A03 {
 
     // OPCODES: 6C 4C
     fn jmp(&mut self, address: usize) {
+        self.pc = address
     }
 
     // OPCODES: 20
     fn jsr(&mut self, address: usize) {
+        let pc = self.pc - 1;
+        self.push((pc >> 8) as u8);
+        self.push(pc as u8);
+        self.pc = address
     }
 
     // OPCODES: A1 A5 A9 AD B1 B5 B9 BD
