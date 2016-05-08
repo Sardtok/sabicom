@@ -16,6 +16,16 @@ pub struct CPU2A03 {
     flag_s: bool
 }
 
+#[derive(Debug,Copy,Clone)]
+enum Operand {
+    Value(u8),
+    Address(usize),
+    A,
+    X,
+    Y,
+    None,
+}
+
 impl CPU2A03 {
     pub fn new() -> CPU2A03 {
         CPU2A03 {
@@ -37,36 +47,98 @@ impl CPU2A03 {
         }
     }
 
-    fn get_address_from_instruction(&mut self) -> usize {
+    fn get_address_from_memory(&mut self, location: usize) -> usize {
+        let hi: usize = self.mem[location] as usize;
+        let lo: usize = self.mem[location + 1] as usize;
+        (hi << 8) | lo
+    }
+
+    fn get_address_from_code(&mut self) -> usize {
+        let hi: usize = self.mem[self.pc] as usize;
+        let lo: usize = self.mem[self.pc + 1] as usize;
+        self.pc += 2;
+        (hi << 8) | lo
+    }
+
+    fn get_address(&mut self, op: Operand) -> usize {
+        match op {
+            Operand::Address(address) => address,
+            _ => panic!("Not an address: {:?}", op)
+        }
+    }
+
+    fn get_next_byte(&mut self) -> u8 {
+        let value: u8 = self.mem[self.pc];
+        self.pc += 1;
+        value
+    }
+
+    fn get_value(&mut self, op: Operand) -> u8 {
+        match op {
+            Operand::Address(addr) => self.mem[addr],
+            Operand::Value(val) => val,
+            Operand::A => self.a,
+            Operand::X => self.x,
+            Operand::Y => self.y,
+            Operand::None => 0
+        }
+    }
+
+    fn set_value(&mut self, op: Operand, value: u8) {
+        match op {
+            Operand::Address(addr) => self.mem[addr] = value,
+            Operand::A => self.a = value,
+            Operand::X => self.x = value,
+            Operand::Y => self.y = value,
+            _ => ()
+        }
+    }
+
+    fn get_instruction_operand(&mut self) -> Operand {
         // Addressing modes:
-        // Indirect Y:  ODD  + 1
-        // Indirect X:  EVEN + 1
-        // Absolute:    EVEN + 0,C,D,E
-        // Absolute X:  ODD  + 0,C,D,E
-        // Absolute Y:  ODD  + 9,E
-        // Accumulator: EVEN + A
-        // Immediate:   EVEN + 0,2,9
-        // Implied:     MISC + 0,8,A,D
-        // Indirect:    6C
-        // Relative:    ODD  + 0
-        // Zero Page:   EVEN + 4,5,6
-        // Zero Page X: ODD  + 4,5,6
-        // Zero Page Y: ODD  + 6
+        // Bits 2 (4), 3 (8), 4 (16).
+        // The choice of addressing mode also depends on bits 0 (1) and 1 (2),
+        // which determines which set of operations are used.
+        //
+        //     00 01 10
+        // 000 IM IX IM Varies
+        // 001 ZP ZP ZP
+        // 010    IM AC Varies
+        // 011 AB AB AB
+        // 100    IY
+        // 101 ZX ZX ZX
+        // 110    AY
+        // 111 AX AX AX
 
-        // Low nibble 1: ADC AND CMP EOR LDA ORA SBC STA
-        // Low nibble 5: ADC AND CMP EOR LDA ORA SBC STA
-        // Low nibble 9: ADC AND CMP EOR LDA ORA SBC STA
-        // Low nibble D: ADC AND CMP EOR LDA ORA SBC STA
-
-        // Low nibble 0: BCC BCS BEQ BMI BNE BPL BRK BVC BVS CPX CPY JSR LDY RTI RTS
-        // Low nibble 2: LDX
-        // Low nibble 4: BIT CPX CPY LDY STY
-        // Low nibble 6: ASL DEC INC LDX LSR ROL ROR STX
-        // Low nibble 8: CLC CLD CLI CLV DEY INX INY PHA PHP PLA PLP SEC SED SEI TAY TYA
-        // Low nibble A: ASL DEX LSR NOP ROL ROR TAX TSX TXA TXS
-        // Low nibble C: BIT CPX CPY JMP LDY STY
-        // Low nibble E: ASL DEC INC LDX LSR ROL ROR STX
-        return 0
+        let instruction = self.get_next_byte();
+        self.pc += 1;
+        match (instruction >> 3) & 7 {
+            0 =>
+                if instruction & 1 == 0 {
+                    Operand::Value(self.mem[self.pc])
+                } else {
+                    Operand::Address((self.get_next_byte() + self.x) as usize) // Zero page pre-indexed X
+                },
+            1 => Operand::Address(self.get_next_byte() as usize), // Zero page
+            2 =>
+                if instruction & 1 == 0 {
+                    Operand::A
+                } else {
+                    Operand::Value(self.get_next_byte())
+                },
+            3 => Operand::Address(self.get_address_from_code()),
+            4 => { // Zero page post-indexed Y
+                let location = self.get_next_byte() as usize;
+                Operand::Address((self.get_address_from_memory(location) + self.y as usize) & 255)
+            },
+            5 => { // Zero page indexed X
+                let location = (self.get_next_byte() + self.x) as usize;
+                Operand::Address(self.get_address_from_memory(location))
+            },
+            6 => Operand::Address(self.get_address_from_code() + self.y as usize), // Absolute indexed Y
+            7 => Operand::Address(self.get_address_from_code() + self.x as usize), // Absolute indexed X
+            _ => Operand::None // Impossible
+        }
     }
 
     fn push(&mut self, value: u8) {
@@ -91,32 +163,32 @@ impl CPU2A03 {
     }
 
     fn set_status(&mut self, value: u8) {
-        self.flag_c = value & 1 != 0;
-        self.flag_z = value & 2 != 0;
-        self.flag_i = value & 3 != 0;
-        self.flag_d = value & 4 != 0;
-        self.flag_b = value & 5 != 0;
-        self.flag_1 = value & 6 != 0;
-        self.flag_v = value & 7 != 0;
-        self.flag_s = value & 8 != 0;
+        self.flag_c = value &   1 != 0;
+        self.flag_z = value &   2 != 0;
+        self.flag_i = value &   4 != 0;
+        self.flag_d = value &   8 != 0;
+        self.flag_b = value &  16 != 0;
+        self.flag_1 = value &  32 != 0;
+        self.flag_v = value &  64 != 0;
+        self.flag_s = value & 128 != 0;
     }
 
     fn set_sign(&mut self, value: u8) {
         self.flag_s = value & 0x80 != 0
     }
-    
+
     fn set_carry(&mut self, carry: bool) {
         self.flag_c = carry
     }
-    
+
     fn set_overflow(&mut self, overflow: bool) {
         self.flag_v = overflow
     }
-    
+
     fn set_zero(&mut self, zero: u8) {
         self.flag_z = zero == 0
     }
-    
+
     fn set_interrupt_disable(&mut self, disable: bool) {
         self.flag_i = disable
     }
@@ -124,9 +196,19 @@ impl CPU2A03 {
     fn set_decimal_mode(&mut self, decimal_mode: bool) {
         self.flag_d = decimal_mode
     }
-    
+
+    // Common code between different comparison instructions
+    fn compare(&mut self, op: Operand, register: u8) {
+        let value = self.get_value(op);
+        let res = register - value;
+        self.set_carry(value > register);
+        self.set_sign(res);
+        self.set_zero(res)
+    }
+
     // OPCODES: 61 65 69 6D 71 75 79 7D
-    fn adc(&mut self, value: u8) {
+    fn adc(&mut self, op: Operand) {
+        let value: u8 = self.get_value(op);
         let acc: u8 = self.a;
         let res: u8 = value + acc + if self.flag_c { 1 } else { 0 };
         self.set_sign(res);
@@ -138,52 +220,45 @@ impl CPU2A03 {
     }
 
     // OPCODES: 21 25 29 2D 31 35 39 3D
-    fn and(&mut self, value: u8) {
-        let res = self.a & value;
+    fn and(&mut self, op: Operand) {
+        let res = self.a & self.get_value(op);
         self.set_sign(res);
         self.set_zero(res);
         self.a = res
     }
 
-    // OPCODES: 06 0E 16 1E
-    fn asl_mem(&mut self, address: usize) {
-        let res = self.mem[address] << 1;
+    // OPCODES: 06 0A 0E 16 1E
+    fn asl(&mut self, op: Operand) {
+        let res = self.get_value(op) << 1;
         self.set_sign(res);
         self.set_zero(res);
-        self.mem[address] = res
+        self.set_value(op, res)
     }
 
-    // OPCODES: 0A
-    fn asl_acc(&mut self) {
-        let res = self.a << 1;
-        self.set_sign(res);
-        self.set_zero(res);
-        self.a = res
-    }
-    
     // OPCODES: 90
-    fn bcc(&mut self, address: usize) {
+    fn bcc(&mut self, op: Operand) {
         if !self.flag_c {
-            self.pc += address
+            self.pc += self.get_address(op)
         }
     }
 
     // OPCODES: B0
-    fn bcs(&mut self, address: usize) {
+    fn bcs(&mut self, op: Operand) {
         if self.flag_c {
-            self.pc += address
+            self.pc += self.get_address(op)
         }
     }
 
     // OPCODES: F0
-    fn beq(&mut self, address: usize) {
+    fn beq(&mut self, op: Operand) {
         if self.flag_z {
-            self.pc += address
+            self.pc += self.get_address(op)
         }
     }
 
     // OPCODES: 24 2C
-    fn bit(&mut self, value: u8) {
+    fn bit(&mut self, op: Operand) {
+        let value = self.get_value(op);
         let acc = self.a;
         self.set_sign(value);
         self.set_overflow(value & 0x40 != 0);
@@ -191,32 +266,32 @@ impl CPU2A03 {
     }
 
     // OPCODES: 30
-    fn bmi(&mut self, address: usize) {
+    fn bmi(&mut self, op: Operand) {
         if self.flag_s {
-            self.pc += address
+            self.pc += self.get_address(op)
         }
     }
 
     // OPCODES: D0
-    fn bne(&mut self, address: usize) {
+    fn bne(&mut self, op: Operand) {
         if !self.flag_z {
-            self.pc += address
+            self.pc += self.get_address(op)
         }
     }
 
     // OPCODES: 10
-    fn bpl(&mut self, address: usize) {
+    fn bpl(&mut self, op: Operand) {
         if !self.flag_s {
-            self.pc += address
+            self.pc += self.get_address(op)
         }
     }
 
     // OPCODES: 00
-    fn brk(&mut self) {
+    fn brk(&mut self, op: Operand) {
         let pc = self.pc + 1;
         self.push((pc >> 8) as u8);
         self.push(pc as u8);
-        
+
         self.flag_b = true;
         let status = self.get_status();
         self.push(status);
@@ -226,66 +301,60 @@ impl CPU2A03 {
     }
 
     // OPCODES: 50
-    fn bvc(&mut self, address: usize) {
+    fn bvc(&mut self, op: Operand) {
         if !self.flag_v {
-            self.pc += address
+            self.pc += self.get_address(op)
         }
     }
 
     // OPCODES: 70
-    fn bvs(&mut self, address: usize) {
+    fn bvs(&mut self, op: Operand) {
         if self.flag_v {
-            self.pc += address
+            self.pc += self.get_address(op)
         }
     }
 
     // OPCODES: 18
-    fn clc(&mut self) {
+    fn clc(&mut self, op: Operand) {
         self.set_carry(false)
     }
 
     // OPCODES: D8
-    fn cld(&mut self) {
+    fn cld(&mut self, op: Operand) {
         self.set_decimal_mode(false)
     }
-    
+
     // OPCODES: 58
-    fn cli(&mut self) {
+    fn cli(&mut self, op: Operand) {
         self.set_interrupt_disable(false)
     }
 
     // OPCODES: B8
-    fn clv(&mut self) {
+    fn clv(&mut self, op: Operand) {
         self.set_overflow(false)
     }
 
     // OPCODES: C1 C5 C9 CD D1 D5 D9 DD
-    fn cmp(&mut self, value: u8) {
-        let acc = self.a;
-        let res = acc - value;
-        self.set_carry(value > acc);
-        self.set_sign(res);
-        self.set_zero(res)
+    fn cmp(&mut self, op: Operand) {
+        let value = self.a;
+        self.compare(op, value)
     }
 
     // OPCODES: E0 E4 EC
-    fn cpx(&mut self, value: u8) {
-        let res = self.x - value;
-        self.set_carry(false); // FIX THIS
-        self.set_sign(res);
-        self.set_zero(res)
+    fn cpx(&mut self, op: Operand) {
+        let value = self.x;
+        self.compare(op, value)
     }
 
     // OPCODES: C0 C4 CC
-    fn cpy(&mut self, value: u8) {
-        let res = self.y - value;
-        self.set_carry(false); // FIX THIS
-        self.set_sign(res);
-        self.set_zero(res)
+    fn cpy(&mut self, op: Operand) {
+        let value = self.y;
+        self.compare(op, value)
     }
 
     // OPCODES: C6 CE D6 DE
-    fn dec(&mut self, address: usize) {
+    fn dec(&mut self, op: Operand) {
+        let address = self.get_address(op);
         let res = self.mem[address] - 1;
         self.set_sign(res);
         self.set_zero(res);
@@ -293,7 +362,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: CA
-    fn dex(&mut self) {
+    fn dex(&mut self, op: Operand) {
         let res = self.x - 1;
         self.set_sign(res);
         self.set_zero(res);
@@ -301,7 +370,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: 88
-    fn dey(&mut self) {
+    fn dey(&mut self, op: Operand) {
         let res = self.y - 1;
         self.set_sign(res);
         self.set_zero(res);
@@ -309,15 +378,16 @@ impl CPU2A03 {
     }
 
     // OPCODES: 41 45 49 4D 51 55 59 5D
-    fn eor(&mut self, value: u8) {
-        let res = self.a ^ value;
+    fn eor(&mut self, op: Operand) {
+        let res = self.a ^ self.get_value(op);
         self.set_sign(res);
         self.set_zero(res);
         self.a = res
     }
 
     // OPCODES: E6 EE F6 FE
-    fn inc(&mut self, address: usize) {
+    fn inc(&mut self, op: Operand) {
+        let address = self.get_address(op);
         let res = self.mem[address] + 1;
         self.set_sign(res);
         self.set_zero(res);
@@ -325,7 +395,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: E8
-    fn inx(&mut self) {
+    fn inx(&mut self, op: Operand) {
         let res = self.x + 1;
         self.set_sign(res);
         self.set_zero(res);
@@ -333,7 +403,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: C8
-    fn iny(&mut self) {
+    fn iny(&mut self, op: Operand) {
         let res = self.y + 1;
         self.set_sign(res);
         self.set_zero(res);
@@ -341,74 +411,69 @@ impl CPU2A03 {
     }
 
     // OPCODES: 6C 4C
-    fn jmp(&mut self, address: usize) {
-        self.pc = address
+    fn jmp(&mut self, op: Operand) {
+        self.pc = self.get_address(op)
     }
 
     // OPCODES: 20
-    fn jsr(&mut self, address: usize) {
+    fn jsr(&mut self, op: Operand) {
         let pc = self.pc - 1;
         self.push((pc >> 8) as u8);
         self.push(pc as u8);
-        self.pc = address
+        self.pc = self.get_address(op);
     }
 
     // OPCODES: A1 A5 A9 AD B1 B5 B9 BD
-    fn lda(&mut self, address: usize) {
+    fn lda(&mut self, op: Operand) {
+        let address = self.get_address(op);
         self.a = self.mem[address];
         self.cc += 1;
     }
 
     // OPCODES: A2 A6 AE B6 BE
-    fn ldx(&mut self, address: usize) {
+    fn ldx(&mut self, op: Operand) {
+        let address = self.get_address(op);
         self.x = self.mem[address];
         self.cc += 1;
     }
 
     // OPCODES: A0 A4 AC B4 BC
-    fn ldy(&mut self, address: usize) {
+    fn ldy(&mut self, op: Operand) {
+        let address = self.get_address(op);
         self.y = self.mem[address];
         self.cc += 1;
     }
 
-    // OPCODES: 46 4E 56 5E
-    fn lsr_mem(&mut self, address: usize) {
-        let res = self.mem[address] >> 1;
+    // OPCODES: 4A 46 4E 56 5E
+    fn lsr(&mut self, op: Operand) {
+        let res = self.get_value(op) >> 1;
         self.set_sign(res);
         self.set_zero(res);
-        self.mem[address] = res
-    }
-
-    // OPCODES: 4A
-    fn lsr_acc(&mut self) {
-        let res = self.a >> 1;
-        self.set_sign(res);
-        self.set_zero(res);
-        self.a = res
+        self.set_value(op, res)
     }
 
     // OPCODES: 01 05 09 0D 11 15 19 1D
-    fn ora(&mut self, value: u8) {
-        let res = self.a | value;
+    fn ora(&mut self, op: Operand) {
+        let res = self.a | self.get_value(op);
         self.set_sign(res);
         self.set_zero(res);
         self.a = res
     }
 
     // OPCODES: 48
-    fn pha(&mut self) {
+    fn pha(&mut self, op: Operand) {
         let value = self.a;
         self.push(value)
     }
 
     // OPCODES: 08
-    fn php(&mut self) {
+    fn php(&mut self, op: Operand) {
         let value = self.get_status();
         self.push(value)
     }
 
     // OPCODES: 68
-    fn pla(&mut self) {
+    fn pla(&mut self, op: Operand) {
         let res = self.pull();
         self.set_sign(res);
         self.set_zero(res);
@@ -416,13 +481,14 @@ impl CPU2A03 {
     }
 
     // OPCODES: 28
-    fn plp(&mut self) {
+    fn plp(&mut self, op: Operand) {
         let value = self.pull();
         self.set_status(value)
     }
 
     // OPCODES: 26 2E 36 3E
-    fn rol_mem(&mut self, address: usize) {
+    fn rol_mem(&mut self, op: Operand) {
+        let address = self.get_address(op);
         let res = (self.mem[address] << 1) | if self.flag_c { 1 } else { 0 };
         let carry = self.mem[address] & 0x80 != 0;
         self.set_carry(carry);
@@ -432,7 +498,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: 2A
-    fn rol_acc(&mut self) {
+    fn rol_acc(&mut self, op: Operand) {
         let res = (self.a << 1) | if self.flag_c { 1 } else { 0 };
         let carry = self.a & 0x80 != 0;
         self.set_carry(carry);
@@ -442,7 +508,8 @@ impl CPU2A03 {
     }
 
     // OPCODES: 66 6E 76 7E
-    fn ror_mem(&mut self, address: usize) {
+    fn ror_mem(&mut self, op: Operand) {
+        let address = self.get_address(op);
         let res = (self.mem[address] >> 1) | if self.flag_c { 0x80 } else { 0 };
         let carry = self.mem[address] & 1 != 0;
         self.set_carry(carry);
@@ -450,9 +517,9 @@ impl CPU2A03 {
         self.set_zero(res);
         self.mem[address] = res
     }
-    
+
     // OPCODES: 6A
-    fn ror_acc(&mut self) {
+    fn ror_acc(&mut self, op: Operand) {
         let res = (self.a >> 1) | if self.flag_c { 0x80 } else { 0 };
         let carry = self.a & 1 != 0;
         self.set_carry(carry);
@@ -462,19 +529,20 @@ impl CPU2A03 {
     }
 
     // OPCODES: 4D
-    fn rti(&mut self) {
+    fn rti(&mut self, op: Operand) {
         let status = self.pull();
         self.set_status(status);
         self.pc = (self.pull() as usize) | ((self.pull() as usize) << 8)
     }
 
     // OPCODES: 60
-    fn rts(&mut self) {
+    fn rts(&mut self, op: Operand) {
         self.pc = (self.pull() as usize) | ((self.pull() as usize) << 8) + 1
     }
 
     // OPCODES: E1 E5 E9 ED F1 F5 F9 FD
-    fn sbc(&mut self, value: u8) {
+    fn sbc(&mut self, op: Operand) {
+        let value = self.get_value(op);
         let acc: u8 = self.a;
         let carry: u8 = if self.flag_c { 0 } else { 1 };
         let res: u8 = acc - value - carry;
@@ -487,37 +555,40 @@ impl CPU2A03 {
     }
 
     // OPCODES: 38
-    fn sec(&mut self) {
+    fn sec(&mut self, op: Operand) {
         self.set_carry(true)
     }
 
     // OPCODES: F8
-    fn sed(&mut self) {
+    fn sed(&mut self, op: Operand) {
         self.set_decimal_mode(true)
     }
 
     // OPCODES: 78
-    fn sei(&mut self) {
+    fn sei(&mut self, op: Operand) {
         self.set_interrupt_disable(true)
     }
 
     // OPCODES: 81 85 89 8D 91 95 99 9D
-    fn sta(&mut self, address: usize) {
-        self.mem[address] = self.a
+    fn sta(&mut self, op: Operand) {
+        let value = self.a;
+        self.set_value(op, value)
     }
 
     // OPCODES: 86 8E 96
-    fn stx(&mut self, address: usize) {
-        self.mem[address] = self.x
+    fn stx(&mut self, op: Operand) {
+        let value = self.x;
+        self.set_value(op, value)
     }
 
     // OPCODES: 84 8C 94
-    fn sty(&mut self, address: usize) {
-        self.mem[address] = self.y
+    fn sty(&mut self, op: Operand) {
+        let value = self.y;
+        self.set_value(op, value)
     }
 
     // OPCODES: AA
-    fn tax(&mut self) {
+    fn tax(&mut self, op: Operand) {
         let src = self.a;
         self.set_zero(src);
         self.set_sign(src);
@@ -525,7 +596,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: A8
-    fn tay(&mut self) {
+    fn tay(&mut self, op: Operand) {
         let src = self.a;
         self.set_zero(src);
         self.set_sign(src);
@@ -533,7 +604,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: BA
-    fn tsx(&mut self) {
+    fn tsx(&mut self, op: Operand) {
         let src = self.sp;
         self.set_zero(src);
         self.set_sign(src);
@@ -541,7 +612,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: 8A
-    fn txa(&mut self) {
+    fn txa(&mut self, op: Operand) {
         let src = self.x;
         self.set_zero(src);
         self.set_sign(src);
@@ -549,7 +620,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: 9A
-    fn txs(&mut self) {
+    fn txs(&mut self, op: Operand) {
         let src = self.x;
         self.set_zero(src);
         self.set_sign(src);
@@ -557,7 +628,7 @@ impl CPU2A03 {
     }
 
     // OPCODES: 98
-    fn tya(&mut self) {
+    fn tya(&mut self, op: Operand) {
         let src = self.y;
         self.set_zero(src);
         self.set_sign(src);
